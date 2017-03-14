@@ -15,6 +15,7 @@ __all__ = [
     "FeatureWTALayer",
     "GlobalPoolLayer",
     "SpatialPyramidPoolingLayer",
+    "RoIPoolLayer"
 ]
 
 
@@ -935,3 +936,37 @@ class SpatialPyramidPoolingLayer(Layer):
     def get_output_shape_for(self, input_shape):
         num_features = sum(p*p for p in self.pool_dims)
         return (input_shape[0], input_shape[1], num_features)
+
+
+class RoIPoolLayer(Layer):
+    """
+    Docstring to be completed later
+    """
+
+    def __init__(self, incoming, pool_h, pool_w, spatial_scale, rois, **kwargs):
+        super(RoIPoolLayer, self).__init__(incoming, **kwargs)
+        if len(self.input_shape) != 4:
+            raise ValueError("Tried to create a RoI Pooling layer with "
+                             "input shape %r. Expected 4 input dimensions "
+                             "(batchsize, channels, height, width) of the image."
+                                 % (self.input_shape,))
+        self.pool_h = pool_h
+        self.pool_w = pool_w
+        self.sp_scale = spatial_scale
+        self.roi = rois
+        # Checking for the version of theano
+        # This comment has to be removed once the ROIPooling gets merged into theano
+        # and a release version of theano should have this Op
+
+        try:
+            self.theano_op = T.signal.pool.RoIPoolOp(self.pool_h, self.pool_w, self.sp_scale)
+        except ImportError:
+            raise ImportError("RoIPoolLayer requires a newer "
+                              "version of theano. You can find it "
+                              "in https://www.github.com/sentient07/Theano on ROIPool branch")
+
+    def get_output_for(self, input, **kwargs):
+        return self.theano_op(input, self.roi)[0]
+
+    def get_output_shape_for(self, input_shape):
+        return tuple(list(input_shape)[:-2]) + (self.roi.ndim, self.pool_h * self.pool_w,)
